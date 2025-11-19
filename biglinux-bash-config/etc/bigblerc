@@ -1,0 +1,233 @@
+# -*- mode: sh; mode: sh-bash -*-
+
+# BigLinux ble.sh Configuration
+# Template reference: https://github.com/akinomyoga/ble.sh/blob/master/blerc.template
+# Documentation: https://github.com/akinomyoga/ble.sh
+# Note: For customizations, edit ~/.blerc instead of modifying this file directly.
+
+# =============================================
+# CORE BLE.SH OPTIONS
+# =============================================
+
+bleopt history_lazyload=1
+bleopt prompt_eol_mark=""
+bleopt exec_errexit_mark=$'\e[91m[exit=%d]\e[m'
+bleopt line_limit_length=300
+bleopt grapheme_cluster=extended
+bleopt complete_ambiguous=
+bleopt complete_requote_threshold=-1
+bleopt complete_auto_delay=150
+bleopt complete_menu_complete_opts=
+bleopt menu_align_max=150
+bleopt highlight_timeout_sync=50
+bleopt highlight_timeout_async=1000
+bleopt syntax_eval_polling_interval=50
+bleopt complete_contract_function_names=1
+bleopt accept_line_threshold=-1 # Enable compatibility with some AI agent and auto debug
+bleopt filename_ls_colors="$LS_COLORS"
+bleopt history_erasedups_limit=100
+
+# =============================================
+# COLOR DEFINITIONS
+# =============================================
+
+# Colors
+reset="\001\033[0m\002"
+whiteFg="\001\033[37m\002"
+redFg="\001\033[31m\002"
+greenFg="\001\033[32m\002"
+yellowFg="\001\033[33m\002"
+blueFg="\001\033[38;5;81m\002"
+blue2Fg="\001\033[38;5;31m\002"
+gitFg="\001\033[38;5;238m\002"
+virtualEnvFg="\001\033[38;5;239m\002"
+
+# Background Colors
+gitBg="\001\033[48;5;238m\002"
+virtualEnvBg="\001\033[48;5;239m\002"
+
+# =============================================
+# ICON DEFINITIONS (NERD FONTS)
+# =============================================
+
+gitBranchIcon=""
+gitModifiedIcon=""
+gitUntrackedIcon=""
+gitStagedIcon=""
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# =============================================
+# PROMPT COMPONENTS
+# =============================================
+
+# Root/non-root color differentiation
+if [[ $EUID = 0 ]]; then
+    promptColorBg='\[\e[97;48;5;88m\]'
+    promptColorFg='\[\e[38;5;88;48;5;24m\]'
+else
+    promptColorBg='\[\e[97;48;5;31m\]'
+    promptColorFg='\[\e[38;5;31;48;5;24m\]'
+fi
+
+
+runPS1() {
+    # ===========================
+    # GIT STATUS 
+    # ===========================
+
+    # Check if inside a Git repository and not in GVFS or Kio
+    if [[ ! "$PWD" =~ ($UID/(gvfs|kio-fuse)) ]] && git rev-parse --is-inside-work-tree &>/dev/null; then
+
+        # Get branch information
+        branch=${ git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null; }
+        
+        if [ -n "$branch" ]; then
+            # Parse Git status efficiently
+            status=${ git status --porcelain=v2 2>/dev/null; }
+            staged=0 modified=0 untracked=0
+            
+            staged=${ grep -c '^1 .M' <<<"$status"; }
+            modified=${ grep -c '^1 M' <<<"$status"; }
+            untracked=${ grep -c '^? ' <<<"$status"; }
+
+            # Build Git prompt section
+            gitPrompt="$reset $gitFg$gitBg$blueFg $gitBranchIcon$whiteFg $branch"
+            [[ $staged -gt 0 ]] && gitPrompt+=" $gitBg$greenFg $gitStagedIcon$whiteFg $staged"
+            [[ $modified -gt 0 ]] && gitPrompt+=" $gitBg$yellowFg $gitModifiedIcon$whiteFg $modified"
+            [[ $untracked -gt 0 ]] && gitPrompt+=" $gitBg$redFg $gitUntrackedIcon$whiteFg $untracked"
+            gitPrompt+=" $reset$gitFg$reset"
+            echo -en "$gitPrompt"
+        fi
+    fi
+
+    # ===========================
+    # VIRTUAL ENVIRONMENT STATUS
+    # ===========================
+
+    if [[ -n $VIRTUAL_ENV ]]; then
+        echo -en "$reset$virtualEnvFg $virtualEnvBg$yellowFg  \001\033[38;5;254m\002$VIRTUAL_ENV $reset$virtualEnvFg$reset"
+    fi
+
+}
+
+
+runttyPS1() {
+    # ===========================
+    # VIRTUAL ENVIRONMENT STATUS
+    # ===========================
+    if [[ -n $VIRTUAL_ENV ]]; then
+        echo -en " venv"
+    fi
+
+    # ===========================
+    # GIT STATUS 
+    # ===========================
+    # Check if inside a Git repository and not in GVFS or Kio
+    if [[ ! "$PWD" =~ ($UID/(gvfs|kio-fuse)) ]] && git rev-parse --is-inside-work-tree &>/dev/null; then
+
+        # Get branch information
+        branch=${ git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --exact-match 2>/dev/null; }
+        
+        if [ -n "$branch" ]; then
+            # Parse Git status efficiently
+            status=${ git status --porcelain=v2 2>/dev/null; }
+            staged=0 modified=0 untracked=0
+            
+            staged=${ grep -c '^1 .M' <<<"$status"; }
+            modified=${ grep -c '^1 M' <<<"$status"; }
+            untracked=${ grep -c '^? ' <<<"$status"; }
+            
+            # Build Git prompt section
+            gitPrompt="$reset $branch"
+            [[ $staged -gt 0 ]] && gitPrompt+="$greenFg S:$staged"      # green
+            [[ $modified -gt 0 ]] && gitPrompt+="$yellowFg M:$modified"    # yellow
+            [[ $untracked -gt 0 ]] && gitPrompt+="$redFg ?:$untracked"   # red
+            gitPrompt+="$reset"
+            echo -en "$gitPrompt "
+        fi
+    fi
+}
+
+
+# =============================================
+# PROMPT CUSTOMIZATION
+# =============================================
+
+setPS1() {
+    echo -e "$promptColorBg  $promptColorFg\[\e[97m\] \u \[\e[38;5;24;48;5;238m\]\[\e[38;5;254m\] \w \[\e[0;38;5;238m\]$gitBg\${ runPS1; }$ps1_virtual_env$reset\[\e[38;5;245m\] \\\t\[\e[0m\]\n$blue2Fg❯ "
+}
+
+setttyPS1() {
+    echo -e "\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\${ runttyPS1; }\[\033[0m\]\$ "
+}
+
+# =============================================
+# TERMINAL-SPECIFIC SETUP
+# =============================================
+
+# Colors
+ble-face -s filename_ls_colors        '' # Disable underline
+ble-face -s filename_other            '' # Disable underline
+ble-face -s filename_executable       'fg=green'
+ble-face -s command_keyword           'fg=blue,italic'
+ble-face -s syntax_varname            'fg=magenta'
+ble-face -s varname_array             'fg=magenta'
+ble-face -s varname_empty             'fg=magenta,italic'
+ble-face -s varname_export            'fg=magenta'
+ble-face -s varname_expr              'fg=magenta'
+ble-face -s varname_hash              'fg=magenta'
+ble-face -s varname_number            'fg=magenta'
+ble-face -s varname_readonly          'fg=magenta'
+ble-face -s varname_transform         'fg=magenta'
+ble-face -s varname_unset             'fg=magenta,italic'
+ble-face -s varname_unset             'fg=magenta'
+ble-face -s command_function          'fg=green,italic'
+ble-face -s syntax_function_name      'fg=yellow'
+ble-face -s syntax_brace              'fg=olive'
+ble-face -s syntax_delimiter          'fg=yellow'
+ble-face -s syntax_quoted             'fg=white'
+ble-face -s command_directory         'fg=green'
+ble-face -s filename_directory        'fg=cyan'
+ble-face -s disabled                  'fg=silver'
+ble-face -s command_keyword           'fg=cyan,italic'
+ble-face -s argument_option           'fg=yellow'
+ble-face -s syntax_param_expansion    'fg=magenta'
+ble-face -s command_alias             'fg=green,italic'
+ble-face -s command_file              'fg=green'
+ble-face -s command_builtin           'fg=lime'
+ble-face -s syntax_command            'fg=green'
+
+if [[ $TERM != linux ]]; then
+    # Set up prompt for interactive shells
+    PS1="${ setPS1; }"
+
+    # Syntax highlighting only for non TTY terminal
+    ble-face -s auto_complete             'fg=242'
+    ble-face -s syntax_error              'fg=silver,bg=52'
+    ble-face -s syntax_comment            'fg=247'
+
+else
+    # TTY terminal setup
+    PS1="${ setttyPS1; }"
+    bleopt prompt_command_changes_layout=1
+fi
+
+# =============================================
+# EMACS MODE SETTINGS
+# =============================================
+
+function blerc/emacs-load-hook {
+    bleopt keymap_emacs_mode_string_multiline=$'\e[1m-- Press Ctrl + J to execute or Ctrl + C to cancel --\e[m'
+    return 0
+}
+blehook/eval-after-load keymap_emacs blerc/emacs-load-hook
+
+# =============================================
+# WORKAROUNDS AND FINAL SETUP
+# =============================================
+
+# Fix PS1 RRR message issue
+ble/function#advice around ble/prompt/update 'prompt_unit="" ble/function#advice/do'
+
+# Load user configuration
+[[ -e ~/.blerc ]] && source ~/.blerc
