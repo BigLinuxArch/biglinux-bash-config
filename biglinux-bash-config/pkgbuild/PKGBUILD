@@ -15,13 +15,13 @@ depends=('fzf'
     'ttf-nerd-fonts-symbols-with-biglinux')
 # makedepends=('')
 # conflicts=('')
-pkgver=$(date +%y.%m.%d)
-pkgrel=$(date +%H%M)
+pkgver=25.10.03
+pkgrel=1721
 arch=('any')
 license=('GPL3')
 url="https://github.com/biglinux/$pkgname"
 provides=("$pkgname")
-source=("git+${url}.git")
+source=("git+${url}.git#branch=stable-2025-10-03_14-16")
 md5sums=('SKIP')
 if [ -e "${pkgname}.install" ];then
     install=${pkgname}.install
@@ -50,4 +50,3 @@ package() {
         cp -r "${InternalDir}/opt" "${pkgdir}/"
     fi
 }
-
